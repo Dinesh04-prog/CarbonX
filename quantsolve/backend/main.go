@@ -16,17 +16,19 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-
 type Asset struct {
 	Name string
 	Cost int
 }
 
+// 1. THIS IS NEW: Tells Go how to read the JSON payload from React
+type Payload struct {
+	Equation    string `json:"equation"`
+	Constraints string `json:"constraints"`
+}
+
 func parseEquation(input string) ([]Asset, int, error) {
-	
 	input = strings.ReplaceAll(input, " ", "")
-	
-	
 	parts := strings.Split(input, "=")
 	if len(parts) != 2 {
 		return nil, 0, fmt.Errorf("invalid format: missing '='")
@@ -37,78 +39,100 @@ func parseEquation(input string) ([]Asset, int, error) {
 		return nil, 0, fmt.Errorf("invalid target budget")
 	}
 
-	
 	re := regexp.MustCompile(`(\d+)([a-zA-Z])`)
 	matches := re.FindAllStringSubmatch(parts[0], -1)
 
 	if len(matches) == 0 {
-		return nil, 0, fmt.Errorf("could not detect any variables (e.g., 10x)")
+		return nil, 0, fmt.Errorf("could not detect any variables")
 	}
 
 	var assets []Asset
 	for _, match := range matches {
 		cost, _ := strconv.Atoi(match[1])
-		name := match[2]
-		assets = append(assets, Asset{Name: name, Cost: cost})
+		assets = append(assets, Asset{Name: match[2], Cost: cost})
 	}
 
 	return assets, target, nil
 }
 
+// 2. THIS IS NEW: Parses rule constraints like "a>5"
+func parseConstraints(input string) (map[string]int, map[string]int) {
+	minVals := make(map[string]int)
+	maxVals := make(map[string]int)
 
-func solveRecursive(assets []Asset, target int, currentCombo map[string]int, conn *websocket.Conn, found *bool) {
+	if input == "" { return minVals, maxVals }
+	input = strings.ReplaceAll(input, " ", "")
+	rules := strings.Split(input, ",")
 
+	re := regexp.MustCompile(`([a-zA-Z]+)(>=|<=|>|<|=)(\d+)`)
+	
+	for _, rule := range rules {
+		match := re.FindStringSubmatch(rule)
+		if len(match) == 4 {
+			v := match[1]
+			op := match[2]
+			val, _ := strconv.Atoi(match[3])
+
+			switch op {
+			case ">": minVals[v] = val + 1
+			case ">=": minVals[v] = val
+			case "<": maxVals[v] = val - 1
+			case "<=": maxVals[v] = val
+			case "=":
+				minVals[v] = val
+				maxVals[v] = val
+			}
+		}
+	}
+	return minVals, maxVals
+}
+
+// 3. UPDATED: Now enforces min/max limits during the recursion
+func solveRecursive(assets []Asset, target int, currentCombo map[string]int, conn *websocket.Conn, found *bool, minVals map[string]int, maxVals map[string]int) {
 	if len(assets) == 1 {
 		lastAsset := assets[0]
-		
-		if target%lastAsset.Cost == 0 { 
+		if target%lastAsset.Cost == 0 {
 			count := target / lastAsset.Cost
+			
+			// Enforce constraints on the final asset
+			if min, ok := minVals[lastAsset.Name]; ok && count < min { return }
+			if max, ok := maxVals[lastAsset.Name]; ok && count > max { return }
+
 			currentCombo[lastAsset.Name] = count
 			
-	
 			var parts []string
 			for k, v := range currentCombo {
 				parts = append(parts, fmt.Sprintf("%s=%d", k, v))
 			}
-			result := "Solution Found: " + strings.Join(parts, ", ")
-			
-	
-			conn.WriteMessage(websocket.TextMessage, []byte(result))
-			time.Sleep(20 * time.Millisecond) 
+			conn.WriteMessage(websocket.TextMessage, []byte("Solution Found: "+strings.Join(parts, ", ")))
+			time.Sleep(20 * time.Millisecond)
 			*found = true
 		}
 		return
 	}
 
-	
 	currentAsset := assets[0]
 	maxAmount := target / currentAsset.Cost
 
-	for i := 0; i <= maxAmount; i++ {
-		
+	// Adjust max loop based on constraints
+	if max, ok := maxVals[currentAsset.Name]; ok && maxAmount > max {
+		maxAmount = max
+	}
+	
+	// Adjust min loop based on constraints
+	minAmount := 0
+	if min, ok := minVals[currentAsset.Name]; ok {
+		minAmount = min
+	}
+
+	for i := minAmount; i <= maxAmount; i++ {
 		newCombo := make(map[string]int)
-		for k, v := range currentCombo {
-			newCombo[k] = v
-		}
+		for k, v := range currentCombo { newCombo[k] = v }
 		newCombo[currentAsset.Name] = i
 
-		
 		leftover := target - (i * currentAsset.Cost)
-		solveRecursive(assets[1:], leftover, newCombo, conn, found)
+		solveRecursive(assets[1:], leftover, newCombo, conn, found, minVals, maxVals)
 	}
-}
-
-func solveAndStream(conn *websocket.Conn, assets []Asset, target int) {
-	found := false
-	initialCombo := make(map[string]int)
-	
-	
-	solveRecursive(assets, target, initialCombo, conn, &found)
-
-	if !found {
-		conn.WriteMessage(websocket.TextMessage, []byte("No whole number solutions exist."))
-	}
-	conn.WriteMessage(websocket.TextMessage, []byte("FINISHED"))
 }
 
 func handleWebSocket(c *gin.Context) {
@@ -117,23 +141,33 @@ func handleWebSocket(c *gin.Context) {
 	defer conn.Close()
 
 	for {
-		_, message, err := conn.ReadMessage()
+		// 4. THIS IS NEW: Reads the JSON object from React instead of plain string
+		var payload Payload
+		err := conn.ReadJSON(&payload)
 		if err != nil { break }
 
-		assets, target, err := parseEquation(string(message))
+		assets, target, err := parseEquation(payload.Equation)
 		if err != nil {
 			conn.WriteMessage(websocket.TextMessage, []byte("Error: "+err.Error()))
 			conn.WriteMessage(websocket.TextMessage, []byte("FINISHED"))
 			continue
 		}
 
-		solveAndStream(conn, assets, target)
+		minVals, maxVals := parseConstraints(payload.Constraints)
+
+		found := false
+		solveRecursive(assets, target, make(map[string]int), conn, &found, minVals, maxVals)
+
+		if !found {
+			conn.WriteMessage(websocket.TextMessage, []byte("No whole number solutions exist."))
+		}
+		conn.WriteMessage(websocket.TextMessage, []byte("FINISHED"))
 	}
 }
 
 func main() {
 	router := gin.Default()
 	router.GET("/ws", handleWebSocket)
-	fmt.Println("QuantSolve Dynamic Engine running on http://localhost:8080")
+	fmt.Println("QuantSolve V3 (JSON Engine) running on http://localhost:8080")
 	router.Run(":8080")
 }
