@@ -175,12 +175,23 @@ func parseConstraints(input string) (map[string]int, map[string]int) {
 func DetermineEquationType(input string) string {
 	input = strings.ToLower(strings.ReplaceAll(input, " ", ""))
 
+	// 1. Check for Fractions
 	if matched, _ := regexp.MatchString(`\/[a-z]|\/\([a-z]`, input); matched {
 		return "rational"
 	}
+
+	// 🌟 THE FIX: Check for High-Degree Exponents (^3, ^4, ^10, etc.) BEFORE checking for ^2!
+	// Regex looks for ^ followed by 3-9, or ^ followed by any double-digit number
+	if matched, _ := regexp.MatchString(`\^[3-9]|\^[1-9]\d+`, input); matched {
+		return "polynomial"
+	}
+
+	// 2. Check for Quadratics
 	if strings.Contains(input, "^2") {
 		return "quadratic"
 	}
+
+	// Catch any weird edge case exponents
 	if strings.Contains(input, "^") {
 		return "polynomial"
 	}
