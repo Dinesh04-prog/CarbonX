@@ -56,37 +56,58 @@ func parseEquation(input string) ([]Asset, int, error) {
 }
 
 // 2. THIS IS NEW: Parses rule constraints like "a>5"
-func parseConstraints(input string) (map[string]int, map[string]int) {
-	minVals := make(map[string]int)
-	maxVals := make(map[string]int)
+// Updated parseEquation function
+func parseEquation(input string, conn *websocket.Conn) ([]Asset, int, error) {
+	// Send Step 1
+	conn.WriteMessage(websocket.TextMessage, []byte("LOG: [STEP 1] Receiving raw input string..."))
+	time.Sleep(300 * time.Millisecond) // Slight delay for visual effect
 
-	if input == "" { return minVals, maxVals }
 	input = strings.ReplaceAll(input, " ", "")
-	rules := strings.Split(input, ",")
-
-	re := regexp.MustCompile(`([a-zA-Z]+)(>=|<=|>|<|=)(\d+)`)
 	
-	for _, rule := range rules {
-		match := re.FindStringSubmatch(rule)
-		if len(match) == 4 {
-			v := match[1]
-			op := match[2]
-			val, _ := strconv.Atoi(match[3])
+	// Send Step 2
+	conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("LOG: [STEP 2] Tokenizing and cleaning whitespace -> '%s'", input)))
+	time.Sleep(300 * time.Millisecond)
 
-			switch op {
-			case ">": minVals[v] = val + 1
-			case ">=": minVals[v] = val
-			case "<": maxVals[v] = val - 1
-			case "<=": maxVals[v] = val
-			case "=":
-				minVals[v] = val
-				maxVals[v] = val
-			}
-		}
+	parts := strings.Split(input, "=")
+	if len(parts) != 2 {
+		return nil, 0, fmt.Errorf("invalid format: missing '='")
 	}
-	return minVals, maxVals
-}
 
+	target, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid target budget")
+	}
+
+	// Send Step 3
+	conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("LOG: [STEP 3] Budget isolated -> Target: %d", target)))
+	time.Sleep(300 * time.Millisecond)
+
+	re := regexp.MustCompile(`(\d+)([a-zA-Z])`)
+	matches := re.FindAllStringSubmatch(parts[0], -1)
+
+	if len(matches) == 0 {
+		return nil, 0, fmt.Errorf("no variables found")
+	}
+
+	var assets []Asset
+	var assetNames []string
+	for _, match := range matches {
+		cost, _ := strconv.Atoi(match[1])
+		name := match[2]
+		assets = append(assets, Asset{Name: name, Cost: cost})
+		assetNames = append(assetNames, fmt.Sprintf("%s(cost:%d)", name, cost))
+	}
+
+	// Send Step 4
+	conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("LOG: [STEP 4] Custom Regex extraction complete -> Variables: %s", strings.Join(assetNames, ", "))))
+	time.Sleep(300 * time.Millisecond)
+	
+	// Send Step 5
+	conn.WriteMessage(websocket.TextMessage, []byte("LOG: [STEP 5] Initializing Recursive DFS Algorithm..."))
+	time.Sleep(200 * time.Millisecond)
+
+	return assets, target, nil
+}
 // 3. UPDATED: Now enforces min/max limits during the recursion
 func solveRecursive(assets []Asset, target int, currentCombo map[string]int, conn *websocket.Conn, found *bool, minVals map[string]int, maxVals map[string]int) {
 	if len(assets) == 1 {
