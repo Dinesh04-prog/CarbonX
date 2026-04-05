@@ -79,7 +79,9 @@ function App() {
 
     // WebSocket Execution
     setTimeout(() => {
-      ws.current = new WebSocket('ws://localhost:8080/ws');
+      // 🌟 THE FIX: Pointed directly to your live Render backend!
+      ws.current = new WebSocket('wss://carbonx-m3z9.onrender.com/ws');
+      
       ws.current.onopen = () => { ws.current.send(JSON.stringify({ equation: equation, constraints: getConstraintsString() })); };
       ws.current.onmessage = (event) => {
         if (event.data === "FINISHED") {
@@ -93,7 +95,6 @@ function App() {
           const cleanSol = event.data.replace("Solution Found: ", "");
           setSolutions((prev) => [...prev, cleanSol]);
         } else if (event.data.startsWith(">")) { 
-          // NEW FIX: Route backend progress updates directly to the terminal!
           setLogs((prev) => [...prev, event.data]);
         } else {
           setSolutions((prev) => [...prev, `ERROR: ${event.data}`]);
@@ -101,8 +102,8 @@ function App() {
         }
       };
       ws.current.onerror = () => {
-        setSolutions([`ERROR: Connection failed. Ensure Go Engine is running on port 8080.`]);
-        setLogs(prev => [...prev, `> FATAL ERROR: Engine Offline.`]);
+        setSolutions([`ERROR: Connection failed. Ensure the Cloud Engine is online.`]);
+        setLogs(prev => [...prev, `> FATAL ERROR: Engine Offline or Connection Blocked.`]);
         setIsSolving(false);
       };
     }, 2200); 
@@ -160,7 +161,7 @@ function App() {
             <div className="max-w-[1000px] mx-auto animate-in fade-in zoom-in-95 duration-300">
               <div className="bg-[#0D1321] border border-quant-border rounded-xl p-10 shadow-2xl">
                 <h2 className="text-2xl font-bold text-white mb-8 border-b border-quant-border/50 pb-4 flex items-center gap-3">
-                   📖 Engine Syntax & Limitations
+                    📖 Engine Syntax & Limitations
                 </h2>
                 
                 <div className="grid grid-cols-2 gap-12">
