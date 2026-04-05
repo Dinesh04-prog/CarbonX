@@ -179,7 +179,14 @@ func DetermineEquationType(input string) string {
 	if matched, _ := regexp.MatchString(`\/[a-z]|\/\([a-z]`, input); matched {
 		return "rational"
 	}
-
+	if matched, _ := regexp.MatchString(`\^[a-z]|\^\(.*[a-z].*\)`, input); matched {
+		return "exponential"
+	}
+	
+	// 🌟 THE FIX: Route both 'sqrt' AND fractional exponents '^(1/' to the Irrational Engine
+	if strings.Contains(input, "sqrt") || strings.Contains(input, "^(1/") {
+		return "irrational"
+	}
 	// 🌟 THE FIX: Check for High-Degree Exponents (^3, ^4, ^10, etc.) BEFORE checking for ^2!
 	// Regex looks for ^ followed by 3-9, or ^ followed by any double-digit number
 	if matched, _ := regexp.MatchString(`\^[3-9]|\^[1-9]\d+`, input); matched {

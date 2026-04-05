@@ -64,6 +64,12 @@ func handleWebSocket(c *gin.Context) {
 		case "rational":
 			// --- NEW RATIONAL LOGIC ---
 			solveRational(payload.Equation, payload.Constraints, conn)
+		case "irrational":
+			// --- NEW IRRATIONAL LOGIC ---
+			solveIrrational(payload.Equation, conn)
+		case "exponential":
+			// --- NEW EXPONENTIAL LOGIC ---
+			solveExponential(payload.Equation, conn)
 		case "polynomial":
 			// --- NEW POLYNOMIAL LOGIC ---
 			solvePolynomial(payload.Equation, conn)	
