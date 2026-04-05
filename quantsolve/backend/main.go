@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os" // 🌟 NEW: Added to read Cloud Environment Variables
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
+// Allow any origin (Since your frontend will be on Vercel)
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
@@ -87,6 +89,13 @@ func handleWebSocket(c *gin.Context) {
 func main() {
 	router := gin.Default()
 	router.GET("/ws", handleWebSocket)
-	fmt.Println("QuantSolve Master Engine running on http://localhost:8080")
-	router.Run(":8080")
+
+	// 🌟 FIX: Cloud providers assign a dynamic port. Fallback to 8080 for local testing.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Printf("QuantSolve Master Engine running on port %s\n", port)
+	router.Run(":" + port)
 }

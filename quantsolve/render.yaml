@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: quantsolve-backend
+    env: go
+    root: backend
+    branch: main
+    buildCommand: go build -o main ./...
+    startCommand: ./main
+    plan: starter
+    autoDeploy: true
+    goVersion: 1.26
+    healthCheckPath: /

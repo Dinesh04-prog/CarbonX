@@ -1,0 +1,14 @@
+# Go build artifacts
+/backend/main
+
+# Node dependencies and build output
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# Environment files
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
