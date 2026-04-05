@@ -8,29 +8,32 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// THE RECURSIVE ENGINE: Tracks node checks via a pointer
+// THE RECURSIVE ENGINE: Now upgraded for continuous decimal fractions!
 func solveRecursive(assets []Asset, target int, currentCombo map[string]int, conn *websocket.Conn, found *bool, minVals map[string]int, maxVals map[string]int, checkCount *int) {
 
 	*checkCount++
 
 	if len(assets) == 1 {
 		lastAsset := assets[0]
-		if target%lastAsset.Cost == 0 {
-			count := target / lastAsset.Cost
+		
+		// 🌟 THE BREAKTHROUGH: No more integer modulo check! We calculate exact floats.
+		exactCount := float64(target) / float64(lastAsset.Cost)
 
-			if min, ok := minVals[lastAsset.Name]; ok && count < min { return }
-			if max, ok := maxVals[lastAsset.Name]; ok && count > max { return }
+		// Check constraints (casting ints to floats to compare)
+		if min, ok := minVals[lastAsset.Name]; ok && exactCount < float64(min) { return }
+		if max, ok := maxVals[lastAsset.Name]; ok && exactCount > float64(max) { return }
 
-			currentCombo[lastAsset.Name] = count
-
-			var parts []string
-			for k, v := range currentCombo {
-				parts = append(parts, fmt.Sprintf("%s=%d", k, v))
-			}
-			conn.WriteMessage(websocket.TextMessage, []byte("Solution Found: "+strings.Join(parts, ", ")))
-			time.Sleep(5 * time.Millisecond)
-			*found = true
+		var parts []string
+		for k, v := range currentCombo {
+			parts = append(parts, fmt.Sprintf("%s=%d", k, v))
 		}
+		
+		// Append the final exact decimal value (to 4 decimal places)
+		parts = append(parts, fmt.Sprintf("%s=%.4f", lastAsset.Name, exactCount))
+
+		conn.WriteMessage(websocket.TextMessage, []byte("Solution Found: "+strings.Join(parts, ", ")))
+		time.Sleep(5 * time.Millisecond)
+		*found = true
 		return
 	}
 

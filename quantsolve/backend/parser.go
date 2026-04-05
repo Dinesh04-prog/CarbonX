@@ -13,8 +13,56 @@ type Asset struct {
 	Cost int
 }
 
+// THE DIVISION DISTRIBUTOR: Distributes division across terms inside a bracket
+func distributeDivision(input string) string {
+	re := regexp.MustCompile(`\(([^)]+)\)\/(\d*\.?\d+)`)
+
+	return re.ReplaceAllStringFunc(input, func(match string) string {
+		submatches := re.FindStringSubmatch(match)
+		insideBrackets := submatches[1]
+		divisorStr := submatches[2]
+
+		divisor, _ := strconv.ParseFloat(divisorStr, 64)
+		if divisor == 0 {
+			return match
+		} 
+
+		assetRe := regexp.MustCompile(`([+-]?\d*\.?\d*)([a-z]?)`)
+
+		expandedInside := assetRe.ReplaceAllStringFunc(insideBrackets, func(assetMatch string) string {
+			assetSub := assetRe.FindStringSubmatch(assetMatch)
+			costInsideStr := assetSub[1]
+			variable := assetSub[2]
+
+			if costInsideStr == "" && variable == "" {
+				return ""
+			}
+
+			if costInsideStr == "" || costInsideStr == "+" {
+				costInsideStr = "1"
+			}
+			if costInsideStr == "-" {
+				costInsideStr = "-1"
+			}
+
+			costInside, _ := strconv.ParseFloat(costInsideStr, 64)
+			newCost := costInside / divisor
+
+			if newCost >= 0 {
+				return fmt.Sprintf("+%.4f%s", newCost, variable)
+			}
+			return fmt.Sprintf("%.4f%s", newCost, variable)
+		})
+
+		return expandedInside
+	})
+}
+
 // THE PRE-PROCESSOR: Expands simple multipliers attached to brackets
 func expandBrackets(input string) string {
+	impliedOneRe := regexp.MustCompile(`(^|[^0-9.])([a-z])`)
+	input = impliedOneRe.ReplaceAllString(input, "${1}1${2}")
+
 	re := regexp.MustCompile(`(\d*\.?\d+)\*?\(([^)]+)\)`)
 
 	return re.ReplaceAllStringFunc(input, func(match string) string {
@@ -45,7 +93,7 @@ func expandBrackets(input string) string {
 // THE POLITE PARSER: Handles strings, brackets, and decimals
 func parseEquation(input string) ([]Asset, int, error) {
 	input = strings.ReplaceAll(input, " ", "")
-	input = strings.ToLower(input) // Variable standardization fix
+	input = strings.ToLower(input)
 	input = expandBrackets(input)
 
 	parts := strings.Split(input, "=")
@@ -106,10 +154,14 @@ func parseConstraints(input string) (map[string]int, map[string]int) {
 			val, _ := strconv.Atoi(match[3])
 
 			switch op {
-			case ">": minVals[v] = val + 1
-			case ">=": minVals[v] = val
-			case "<": maxVals[v] = val - 1
-			case "<=": maxVals[v] = val
+			case ">":
+				minVals[v] = val + 1
+			case ">=":
+				minVals[v] = val
+			case "<":
+				maxVals[v] = val - 1
+			case "<=":
+				maxVals[v] = val
 			case "=":
 				minVals[v] = val
 				maxVals[v] = val
@@ -118,26 +170,37 @@ func parseConstraints(input string) (map[string]int, map[string]int) {
 	}
 	return minVals, maxVals
 }
+
 // THE DETECTIVE: Scans the string to determine the equation family
 func DetermineEquationType(input string) string {
 	input = strings.ToLower(strings.ReplaceAll(input, " ", ""))
 
-	// Check for Rational (fractions with variables in denominator) e.g., /x
-	matched, _ := regexp.MatchString(`\/[a-z]`, input)
-	if matched {
+	if matched, _ := regexp.MatchString(`\/[a-z]|\/\([a-z]`, input); matched {
 		return "rational"
 	}
-
-	// Check for Quadratics (contains ^2)
 	if strings.Contains(input, "^2") {
 		return "quadratic"
 	}
-
-	// Check for other Polynomials (contains ^3, ^4, etc.)
 	if strings.Contains(input, "^") {
 		return "polynomial"
 	}
 
-	// Default assumption if no special characters are found
+	re := regexp.MustCompile(`[a-z]`)
+	matches := re.FindAllString(input, -1)
+	uniqueVars := make(map[string]bool)
+	for _, m := range matches {
+		uniqueVars[m] = true
+	}
+
+	parts := strings.Split(input, "=")
+	hasLetterOnRight := false
+	if len(parts) == 2 {
+		hasLetterOnRight, _ = regexp.MatchString(`[a-z]`, parts[1])
+	}
+
+	if len(uniqueVars) == 1 || hasLetterOnRight {
+		return "polynomial"
+	}
+
 	return "linear"
 }

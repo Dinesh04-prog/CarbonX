@@ -18,7 +18,6 @@ type Payload struct {
 	Constraints string `json:"constraints"`
 }
 
-
 // THE WEBSOCKET CONTROLLER & TRAFFIC ROUTER
 func handleWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -53,17 +52,24 @@ func handleWebSocket(c *gin.Context) {
 			solveRecursive(assets, target, make(map[string]int), conn, &found, minVals, maxVals, &checkCount)
 
 			if !found {
-				conn.WriteMessage(websocket.TextMessage, []byte("No whole number solutions exist within these constraints."))
+				conn.WriteMessage(websocket.TextMessage, []byte("No valid solutions exist within these constraints."))
 			}
 
 			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("STATS:%d", checkCount)))
 			
 		case "quadratic":
-			// --- NEW QUADRATIC LOGIC ---
+			// --- EXISTING QUADRATIC LOGIC ---
 			solveQuadratic(payload.Equation, conn)
 
+		case "rational":
+			// --- NEW RATIONAL LOGIC ---
+			solveRational(payload.Equation, payload.Constraints, conn)
+		case "polynomial":
+			// --- NEW POLYNOMIAL LOGIC ---
+			solvePolynomial(payload.Equation, conn)	
+
 		default:
-			// Catch-all for rational/polynomials until we build them
+			// Catch-all for polynomials
 			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("ERROR: Engine currently does not support %s equations.", eqType)))
 		}
 
@@ -71,6 +77,7 @@ func handleWebSocket(c *gin.Context) {
 		conn.WriteMessage(websocket.TextMessage, []byte("FINISHED"))
 	}
 }
+
 func main() {
 	router := gin.Default()
 	router.GET("/ws", handleWebSocket)

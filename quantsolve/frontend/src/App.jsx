@@ -49,8 +49,9 @@ function App() {
     }
     
    // FAILSAFE 2: High-Degree Polynomial Shield (Allowing Quadratics now!)
-    if (/[a-zA-Z]\s*[*\/]\s*[a-zA-Z]/.test(equation) || /\^[3-9]|\*\*/.test(equation)) {
-      setSolutions(["ERROR: High-Degree Math Detected. Exponents ^3 and above are blocked in V2."]);
+  
+    if (/[a-zA-Z]\s*[*\/]\s*[a-zA-Z]/.test(equation)) {
+      setSolutions(["ERROR: Multi-variable multiplication (x*y) is blocked in V3."]);
       setLogs(["> ERROR: Complexity exceeds current solver threshold."]);
       return;
     }
