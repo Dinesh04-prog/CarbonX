@@ -123,11 +123,11 @@ function App() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-quant-bg border-r border-quant-border flex flex-col z-10">
         <div className="h-16 flex items-center px-6">
-          <span className="text-xl font-bold tracking-tight text-quant-primary">Quant<span className="text-white">Solve</span></span>
+          <span className="text-xl font-bold tracking-tight text-quant-primary">CarbonX</span>
         </div>
         <div className="px-6 py-4 flex items-center gap-3">
-          <div className={`w-10 h-10 rounded bg-quant-panel border border-quant-border flex items-center justify-center text-lg shadow-inner ${isLightMode ? 'invert hue-rotate-180' : ''}`}>👨‍💼</div>
-          <div><div className="text-sm font-bold text-white">QuantSolve</div><div className="text-xs text-quant-text">Quant Analyst</div></div>
+          <div className="w-10 h-10 rounded bg-quant-panel border border-quant-border"></div>
+          <div><div className="text-sm font-bold text-white">CarbonX</div><div className="text-xs text-quant-text">&nbsp;</div></div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           <button onClick={() => {setHeaderTab('solver'); setActiveSidebarTab('solver')}} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${activeSidebarTab === 'solver' ? 'bg-quant-panel text-white' : 'text-quant-text hover:text-white'}`}>
