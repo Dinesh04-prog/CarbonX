@@ -48,10 +48,10 @@ function App() {
       return;
     }
     
-    // FAILSAFE 2: Non-Linear & Quadratic Shield
-    if (/[a-zA-Z]\s*[*\/]\s*[a-zA-Z]/.test(equation) || /\^|\*\*/.test(equation)) {
-      setSolutions(["ERROR: Non-Linear/Quadratic Math Detected. Exponents and variable multiplication (x*y) are blocked in V1."]);
-      setLogs(["> ERROR: Complexity exceeds Linear Solver threshold."]);
+   // FAILSAFE 2: High-Degree Polynomial Shield (Allowing Quadratics now!)
+    if (/[a-zA-Z]\s*[*\/]\s*[a-zA-Z]/.test(equation) || /\^[3-9]|\*\*/.test(equation)) {
+      setSolutions(["ERROR: High-Degree Math Detected. Exponents ^3 and above are blocked in V2."]);
+      setLogs(["> ERROR: Complexity exceeds current solver threshold."]);
       return;
     }
     
@@ -91,6 +91,9 @@ function App() {
         } else if (event.data.startsWith("Solution Found:")) {
           const cleanSol = event.data.replace("Solution Found: ", "");
           setSolutions((prev) => [...prev, cleanSol]);
+        } else if (event.data.startsWith(">")) { 
+          // NEW FIX: Route backend progress updates directly to the terminal!
+          setLogs((prev) => [...prev, event.data]);
         } else {
           setSolutions((prev) => [...prev, `ERROR: ${event.data}`]);
           setLogs(prev => [...prev, `> ERROR DETECTED.`]);
