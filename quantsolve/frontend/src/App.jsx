@@ -6,6 +6,10 @@ function App() {
   const [solutions, setSolutions] = useState([]);
   const [isSolving, setIsSolving] = useState(false);
   const [activeTab, setActiveTab] = useState('solver');
+  const [searchSpace, setSearchSpace] = useState("0");
+  
+  // NEW STATE: Theme Toggle
+  const [isLightMode, setIsLightMode] = useState(false);
   
   const [rules, setRules] = useState([]);
   const [showRuleForm, setShowRuleForm] = useState(false);
@@ -40,10 +44,11 @@ function App() {
     
     setSolutions([]);
     setLogs([]);
+    setSearchSpace("0"); // Reset counter on new run
     setIsSolving(true);
 
     setTimeout(() => {
-      const tokens = equation.split(/([+=\s])/).filter(t => t.trim() !== '');
+      const tokens = equation.match(/([0-9.]+|[a-zA-Z]+|[+\-*/=()])/g) || [];
       setLogs([`Step 1: Tokenizing... [${tokens.map(t => `'${t}'`).join(', ')}]`]);
     }, 100);
 
@@ -65,6 +70,10 @@ function App() {
           setIsSolving(false);
           setLogs(prev => [...prev, `> EXECUTION COMPLETE. Link closed.`]);
           ws.current.close();
+        } else if (event.data.startsWith("STATS:")) {
+          // Catch the stats and format them with commas
+          const count = event.data.split(":")[1];
+          setSearchSpace(parseInt(count).toLocaleString());
         } else if (event.data.startsWith("Solution Found:")) {
           const cleanSol = event.data.replace("Solution Found: ", "");
           setSolutions((prev) => [...prev, cleanSol]);
@@ -81,8 +90,6 @@ function App() {
     }, 2200); 
   };
 
-  // --- NEW: DYNAMIC TABLE PARSER ---
-  // This automatically finds the variables (a, b, c, etc.) to create the table headers
   const getDynamicHeaders = () => {
     if (solutions.length === 0) return [];
     const validSol = solutions.find(s => !s.startsWith("ERROR"));
@@ -92,7 +99,9 @@ function App() {
   const tableHeaders = getDynamicHeaders();
 
   return (
-    <div className="min-h-screen bg-quant-bg text-quant-white font-sans flex overflow-hidden">
+    // Hackathon Trick: By adding standard CSS filters when isLightMode is true, 
+    // it perfectly inverts the dark mode into a light mode without rewriting 100 color classes!
+    <div className={`min-h-screen bg-quant-bg text-quant-white font-sans flex overflow-hidden transition-all duration-500 ${isLightMode ? 'invert hue-rotate-180' : ''}`}>
       
       {/* SIDEBAR */}
       <aside className="w-64 bg-quant-bg border-r border-quant-border flex flex-col z-10">
@@ -100,7 +109,8 @@ function App() {
           <span className="text-xl font-bold tracking-tight text-quant-primary">Quant<span className="text-white">Solve</span></span>
         </div>
         <div className="px-6 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded bg-quant-panel border border-quant-border flex items-center justify-center text-lg shadow-inner">👨‍💼</div>
+          {/* We remove invert on emojis so they don't look weird in light mode */}
+          <div className={`w-10 h-10 rounded bg-quant-panel border border-quant-border flex items-center justify-center text-lg shadow-inner ${isLightMode ? 'invert hue-rotate-180' : ''}`}>👨‍💼</div>
           <div><div className="text-sm font-bold text-white">QuantSolve</div><div className="text-xs text-quant-text">High-Frequency Analyst</div></div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -118,12 +128,28 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0A0E17]">
+        
+        {/* --- HEADER --- */}
         <header className="h-16 border-b border-quant-border flex items-center justify-between px-8 bg-quant-bg/50 backdrop-blur-sm">
           <div className="flex gap-8 text-sm font-semibold text-quant-text">
             <button className="text-white h-16 border-b-2 border-quant-primary">Solver Dashboard</button>
             <button className="hover:text-white transition-colors">Research</button>
           </div>
+          
+          {/* TOP RIGHT CONTROLS */}
           <div className="flex items-center gap-4">
+            
+            {/* THE NEW THEME TOGGLE BUTTON */}
+            <button 
+              onClick={() => setIsLightMode(!isLightMode)}
+              className="flex items-center justify-center w-8 h-8 rounded bg-quant-bg border border-quant-border text-quant-text hover:text-white hover:border-quant-text transition-all"
+              title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              <span className={isLightMode ? 'invert hue-rotate-180' : ''}>
+                {isLightMode ? '🌙' : '☀️'}
+              </span>
+            </button>
+
             <button className="bg-quant-primary text-white text-xs font-bold px-4 py-2 rounded-md shadow-sm">Live Status</button>
           </div>
         </header>
@@ -134,8 +160,10 @@ function App() {
             {/* KPI CARDS */}
             <div className="grid grid-cols-4 gap-6">
               <div className="bg-[#0D1321] border border-quant-border rounded-xl p-5 shadow-lg">
-                <div className="text-[10px] text-quant-text font-bold tracking-widest uppercase mb-2">Search Space</div>
-                <div className="text-3xl font-mono text-blue-300 font-medium">4.2M+</div>
+                <div className="text-[10px] text-quant-text font-bold tracking-widest uppercase mb-2">Possibilities Checked</div>
+                <div className="text-3xl font-mono text-blue-300 font-medium">
+                  {isSolving ? <span className="animate-pulse">Crunching...</span> : searchSpace}
+                </div>
               </div>
               <div className="bg-[#0D1321] border border-quant-border rounded-xl p-5 shadow-lg">
                 <div className="text-[10px] text-quant-text font-bold tracking-widest uppercase mb-2">Solutions Found</div>
@@ -173,7 +201,7 @@ function App() {
               </div>
 
               <div className="col-span-1 bg-[#0D1321] border border-quant-border rounded-xl p-6 shadow-lg flex flex-col">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><span className="text-blue-400">⚡</span> Execution Terminal</h3>
+                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><span className={`text-blue-400 ${isLightMode ? 'invert hue-rotate-180' : ''}`}>⚡</span> Execution Terminal</h3>
                 <div className="flex-1 bg-black rounded border border-quant-border p-4 font-mono text-[11px] overflow-y-auto space-y-2 relative">
                   {logs.length === 0 ? <span className="text-quant-text opacity-50 absolute top-4 left-4">System idle. Awaiting input.</span> : logs.map((log, i) => (
                       <div key={i} className={`${log.includes('ERROR') ? 'text-rose-400' : 'text-blue-300'}`}>
@@ -188,17 +216,14 @@ function App() {
             {/* ROW 3: SOLUTIONS & RULE ENGINE */}
             <div className="grid grid-cols-3 gap-6 h-[400px]">
               
-              {/* THE NEW DATA GRID TABLE */}
-              {/* THE NEW DATA GRID TABLE */}
-              <div className="col-span-6 bg-[#0D1321] border border-quant-border rounded-xl shadow-lg flex flex-col overflow-hidden">
+              <div className="col-span-2 bg-[#0D1321] border border-quant-border rounded-xl shadow-lg flex flex-col overflow-hidden">
                 <div className="px-6 py-4 border-b border-quant-border flex justify-between items-center bg-[#111827]">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span className="text-quant-accent">📊</span> Valid Solutions Found
+                    <span className={`text-quant-accent ${isLightMode ? 'invert hue-rotate-180' : ''}`}>📊</span> Valid Solutions Found
                   </h3>
                 </div>
                 
-                {/* Dynamic Table Header (UPDATED: Larger text, fixed column widths) */}
-                <div className="flex gap-16 px-8 py-4 border-b border-quant-border bg-quant-bg/200 text-lg font-bold text-white tracking-widest">
+                <div className="flex gap-16 px-8 py-4 border-b border-quant-border bg-quant-bg/80 text-lg font-bold text-white tracking-widest">
                   {tableHeaders.length > 0 ? tableHeaders.map(header => (
                     <div key={header} className="w-32">{header}</div>
                   )) : (
@@ -206,7 +231,6 @@ function App() {
                   )}
                 </div>
 
-                {/* Dynamic Table Body (UPDATED: Larger text, matching gaps) */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#0D1321]">
                   {solutions.length === 0 && !isSolving && logs.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-quant-text font-mono text-base opacity-50">
@@ -216,16 +240,14 @@ function App() {
                   
                   <div>
                     {solutions.map((sol, index) => {
-                      // Handle our polite errors safely
                       if (sol.startsWith("ERROR:")) {
                         return (
                           <div key={index} className="m-4 px-4 py-3 bg-rose-950/30 border border-rose-900/50 rounded-lg text-rose-400 font-mono text-base">
-                            <span>⚠️</span> {sol.replace("ERROR: ", "")}
+                            <span className={isLightMode ? 'invert hue-rotate-180' : ''}>⚠️</span> {sol.replace("ERROR: ", "")}
                           </div>
                         );
                       }
 
-                      // Parse "a=40, b=0, c=10" into a dictionary like { a: "40", b: "0", c: "10" }
                       const pairs = sol.split(", ");
                       const valMap = {};
                       pairs.forEach(p => {
@@ -248,11 +270,10 @@ function App() {
                 </div>
               </div>
 
-              {/* DYNAMIC RULE ENGINE */}
               <div className="col-span-1 bg-[#0D1321] border border-quant-border rounded-xl shadow-lg flex flex-col overflow-hidden">
                  <div className="px-6 py-4 border-b border-quant-border flex justify-between items-center bg-[#111827]">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span className="text-blue-400">⚖</span> The Rule Engine
+                    <span className={`text-blue-400 ${isLightMode ? 'invert hue-rotate-180' : ''}`}>⚖</span> The Rule Engine
                   </h3>
                   <button onClick={() => setShowRuleForm(!showRuleForm)} className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold hover:bg-blue-400 transition-colors">
                     {showRuleForm ? '×' : '+'}
